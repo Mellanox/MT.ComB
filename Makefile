@@ -1,8 +1,17 @@
+#
+#  Copyright (c) 2017-2018 Mellanox Technologies Ltd. ALL RIGHTS RESERVED.
+#
+#   $COPYRIGHT$
+#
+#   Additional copyrights may follow
+#
+#   $HEADER$
+#
 
 CFLAGS ?= -g -lpthread
-MPICC ?= /labhome/xinz/workplace/ompi/source/0debug/install/bin/mpicc
+MPICC ?= /home/artpol/sandbox/openmpi-1.6.5/bin/mpicc
 
-UCX_HOME ?= /labhome/xinz/workplace/ucx/install
+UCX_HOME ?= 
 MXM_HOME ?=
 LIBF_HOME ?=
 
