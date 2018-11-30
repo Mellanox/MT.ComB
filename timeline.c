@@ -195,7 +195,6 @@ int _write_timeline(timeline_t *tl, FILE *fp)
     double start, end;
     int nres;
     resource_map_t *map;
-    fp = stdout;
 
     /* Printf fixed prefix */
     fprintf(fp, "%s", prefix);
@@ -227,6 +226,6 @@ int write_timeline(timeline_t *tl, char *fname)
 #ifdef STANDALONE
 int main()
 {
-    _write_timeline(&tl, "output.gpl");
+    write_timeline(&tl, "output.gpl");
 }
 #endif
