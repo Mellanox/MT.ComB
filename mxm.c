@@ -20,13 +20,9 @@ int *quit_flag = NULL;
 
 #define MXM_TEST_HID_QUIT 4
 
-void set_default_args() {
-    worker = worker_nb;
-    threads = 1;
-    win_size = 256;
-    iterations = 50;
-    warmup = 10;
-    msg_size = 1;
+int is_mpi_based_test()
+{
+    return 0;
 }
 
 void special_usage(char *cmd) {
@@ -126,6 +122,8 @@ int connect_eps() {
 
     return 0;
 }
+
+int mem_map() { /* nothing to do */ }
 
 void cleanup_ctx() {
     mxm_mq_destroy(mq);

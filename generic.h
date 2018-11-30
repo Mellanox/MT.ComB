@@ -43,6 +43,8 @@ struct thread_info {
     int worker_idx;
 };
 
+int is_mpi_based_test();
+
 void *(*worker)(void *);
 void *worker_b(void *);
 void *worker_nb(void *);
@@ -66,6 +68,11 @@ void verify_buf();
 int init_ctx();
 void cleanup_ctx();
 int connect_eps();
+
+void setup_thread_info_single(struct thread_info *ti);
+void setup_thread_info_multi(struct thread_info *ti, int idx);
+void cleanup_thread_info(struct thread_info *ti, int size);
+int mem_map();
 
 void set_default_args();
 void pre_scan_args(int argc, char **argv);
