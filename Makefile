@@ -9,7 +9,7 @@
 #
 
 CFLAGS ?= -g -lpthread
-MPICC ?= /home/artpol/sandbox/openmpi-1.6.5/bin/mpicc
+MPICC ?= 
 
 UCX_HOME ?= 
 MXM_HOME ?=
