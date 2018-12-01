@@ -791,6 +791,9 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+    /* allocate data buf */
+    allocate_global_buf();
+
     process_args(argc, argv);
 
     if (threads > 1) {
@@ -817,8 +820,6 @@ int main(int argc, char *argv[]) {
     timeline_event_t (*timings)[2 * iterations] = calloc(threads * 2 * iterations,
                                              sizeof(timeline_event_t));
 
-    /* allocate data buf */
-    allocate_global_buf();
 
     if (ret = mem_map()) {
         MPI_Finalize();
@@ -881,11 +882,12 @@ int main(int argc, char *argv[]) {
 
     cleanup_thread_info(ti, threads);
 
+    cleanup_ctx();
+
     free(id);
     free(results);
     free(global_buf);
     free(ti);
-    cleanup_ctx();
     MPI_Comm_free(&comm);
     MPI_Finalize();
     return 0;
