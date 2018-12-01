@@ -11,7 +11,7 @@
 CFLAGS ?= -g -lpthread
 MPICC ?= mpicc
 
-UCX_HOME ?= 
+UCX_HOME ?=
 UCX_CFLAGS = -I$(UCX_HOME)/include/
 UCX_LDFLAGS = -L$(UCX_HOME)/lib/ -lucp -lucs -luct -lucm
 MXM_HOME ?=
@@ -22,7 +22,10 @@ LIBF_HOME ?=
 GENERIC_DEPS = generic.h generic.c mpi.c timeline.c
 GENERIC_CFILES = generic.c timeline.c
 
-all: mtcomb_mpip2p mtcomb_mpiosc mtcomb_ucxp2p mtcomb_ucxamo
+all: mtcomb_mpip2p mtcomb_mpiosc mtcomb_ucxp2p mtcomb_ucxamo mtcomb_timeline
+
+mtcomb_timeline: timeline.c timeline.h timeline_plot.c
+	gcc $(CFLAGS) -o mtcomb_timeline timeline.c timeline_plot.c
 
 mtcomb_mpip2p: $(GENERIC_DEPS) mpi.c
 	$(MPICC) $(CFLAGS) -o mtcomb_mpi mpi.c $(GENERIC_CFILES)
@@ -38,6 +41,7 @@ mtcomb_ucxamo: $(GENERIC_DEPS) ucx.c
 
 mtcomb_mxm: $(GENERIC_DEPS) mxm.c
 	$(MPICC) -Wl,-rpath,$(MXM_HOME)/lib/ $(CFLAGS) $(MXM_CFLAGS) -o mtcomb_mxm mxm.c $(GENERIC_CFILES) $(MXM_LDFLAGS)
+
 
 #libf: generic.h generic.c libfabric.c
 #	$(MPICC) -Wl,-rpath,$(LIBF_HOME)/lib/ -I$(LIBF_HOME)/include/ -L$(LIBF_HOME)/lib/ $(CFLAGS) -o libf_bench generic.h generic.c libfabric.c

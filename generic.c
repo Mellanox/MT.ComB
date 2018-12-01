@@ -865,9 +865,9 @@ int main(int argc, char *argv[]) {
             tl.procs[0].threads[i].num_events = iterations * 2;
             tl.procs[0].threads[i].events = timings[i];
         }
-        sprintf(fname, "mtcomb_timeline_%s_%d.gpl",
+        sprintf(fname, "mtcomb_timeline_%s_%d.mtcomb",
                 (i_am_sender) ? "sndr" : "rcvr", getpid());
-        write_timeline(&tl, fname);
+        serialize_timeline(&tl, fname);
 
         free(tl.procs[0].threads);
         free(tl.procs);

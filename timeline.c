@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 
 //#define STANDALONE
 #include "timeline.h"
@@ -75,20 +76,32 @@ void find_proc_xrange(proc_timeline_t *proc_tl, double *_start, double *_end)
     *_end = end;
 }
 
-void find_timeline_xrange(timeline_t *tl, double *_start, double *_end)
+int find_timeline_xrange(timeline_t *tl, double *_start, double *_end,
+                          int ref_proc, int ref_thr, int ref_ev, int ev_cnt)
 {
     int p;
     double start = -1, end = -1;
 
-    for(p = 0; p < tl->proc_num; p++){
-        double t_start, t_end;
-        find_proc_xrange(&tl->procs[p], &t_start, &t_end);
-        if( 0 > start || (start > t_start) ) {
-            start = t_start;
+    if( (ref_proc > tl->proc_num) || (ref_thr > tl->procs[ref_proc].thr_num)
+            || (ref_ev > tl->procs[ref_proc].threads[ref_thr].num_events)
+            || ((ref_ev + ev_cnt) > tl->procs[ref_proc].threads[ref_thr].num_events) ){
+        return EINVAL;
+    }
+
+    if( (0 > ref_proc) || (0 > ref_thr) || (0 > ref_ev) || (0 > ev_cnt)) {
+        for(p = ref_proc; p < tl->proc_num; p++){
+            double t_start, t_end;
+            find_proc_xrange(&tl->procs[p], &t_start, &t_end);
+            if( 0 > start || (start > t_start) ) {
+                start = t_start;
+            }
+            if( 0 > end || (end < t_end) ) {
+                end = t_end;
+            }
         }
-        if( 0 > end || (end < t_end) ) {
-            end = t_end;
-        }
+    } else {
+        start = tl->procs[ref_proc].threads[ref_thr].events[ref_ev].start;
+        end = start = tl->procs[ref_proc].threads[ref_thr].events[ref_ev + ev_cnt].end;
     }
     *_start = start;
     *_end = end;
@@ -146,7 +159,7 @@ void build_yticks(timeline_t *tl, resource_map_t *map, int nres, int step,
 }
 
 
-void write_bars(FILE *fp, timeline_t *tl, double range_start,
+void write_bars(FILE *fp, timeline_t *tl, double r_start, double r_end,
                 resource_map_t *map, int nres, int ystep)
 {
     int p, t;
@@ -162,13 +175,17 @@ void write_bars(FILE *fp, timeline_t *tl, double range_start,
             }
             for(e = 0; e < tl->procs[p].threads[t].num_events; e++){
                 timeline_event_t *ev = &tl->procs[p].threads[t].events[e];
+                /* Filter by the time range */
+                if( ev->start < r_start || ev->end < r_end ){
+                    continue;
+                }
                 fprintf(fp, "set object %d rectangle from ", objnum++);
                 fprintf(fp, "%.3lf, %f",
-                        1E6*(ev->start - range_start),
+                        1E6*(ev->start - r_start),
                         (i + 1) * ystep - ydelta);
                 fprintf(fp," to ");
                 fprintf(fp, "%.3lf, %f",
-                        1E6*(ev->end - range_start),
+                        1E6*(ev->end - r_start),
                         (i + 1) * ystep + ydelta);
                 fprintf(fp, " fillcolor rgb ");
                 switch(ev->type) {
@@ -196,7 +213,8 @@ char *prefix =
         "set palette model RGB\n"
         "unset colorbox\n";
 
-int _write_timeline(timeline_t *tl, FILE *fp)
+int _write_timeline(timeline_t *tl, FILE *fp,
+                    int start_p, int start_thr, int start_ev, int ev_count)
 {
     double start, end;
     int nres;
@@ -205,8 +223,15 @@ int _write_timeline(timeline_t *tl, FILE *fp)
     /* Printf fixed prefix */
     fprintf(fp, "%s", prefix);
 
+    if( (0 > start_p) || (0 > start_thr) || (0 > start_ev)){
+        start_p = 0;
+        start_thr = 0;
+        start_ev = 0;
+    }
+
     /* Print ranges and y lables */
-    find_timeline_xrange(tl, &start, &end);
+    find_timeline_xrange(tl, &start, &end,
+                         start_p, start_thr, start_ev, ev_count);
     fprintf(fp, "set xrange [0.000:%lf]\n", 1E6*(end - start));
     char ytics[1024] = "";
     nres = find_timeline_res(tl, &map);
@@ -215,7 +240,7 @@ int _write_timeline(timeline_t *tl, FILE *fp)
     fprintf(fp, "set ytics %s\n", ytics);
     fprintf(fp, "set title \"MT.ComB: %d-thread timeline\"\n", nres);
 
-    write_bars(fp, tl, start, map, nres, ystep);
+    write_bars(fp, tl, start, end, map, nres, ystep);
 
     fprintf(fp, "plot \\\n"
             "-1 title \"Post\" with lines linecolor rgb \"" COLOR_1 "\" linewidth 6, \\\n"
@@ -223,15 +248,138 @@ int _write_timeline(timeline_t *tl, FILE *fp)
 
 }
 
-int write_timeline(timeline_t *tl, char *fname)
+int write_timeline(timeline_t *tl, char *fname,
+                   int ref_proc, int ref_thr, int ref_ev, int ev_cnt)
 {
     FILE *fp = fopen(fname, "w");
-    _write_timeline(tl, fp);
+    _write_timeline(tl, fp, ref_proc, ref_thr, ref_ev, ev_cnt);
 }
+
+
+int serialize_item(void *ptr, int elem_size, int elem_count, FILE *fp)
+{
+    size_t written = 0;
+    written = fwrite(ptr, elem_size, elem_count, fp);
+    if( written != (elem_count * elem_size) ) {
+        return EIO;
+    }
+    return 0;
+}
+
+int deserialize_item(void *ptr, int elem_size, int elem_count, FILE *fp)
+{
+    size_t read = 0;
+    read = fread(ptr, elem_size, elem_count, fp);
+    if( read != (elem_count * elem_size) ) {
+        return EIO;
+    }
+    return 0;
+}
+
+#define SERIALIZE_ITEM(ptr, esize, ecnt, fp) {    \
+    int rc;                                       \
+    rc = serialize_item(ptr, esize, ecnt, fp);    \
+    if( rc ){                                     \
+        return rc;                                \
+    }                                             \
+}
+
+#define DESERIALIZE_ITEM(ptr, esize, ecnt, fp) {    \
+    int rc;                                         \
+    rc = deserialize_item(ptr, esize, ecnt, fp);    \
+    if( rc ){                                       \
+        return rc;                                  \
+    }                                               \
+}
+
+
+int serialize_thread(thread_timeline_t *ttl, FILE *fp)
+{
+    SERIALIZE_ITEM(&ttl->thr_id, sizeof(ttl->thr_id), 1, fp);
+    SERIALIZE_ITEM(&ttl->num_events, sizeof(ttl->num_events), 1, fp);
+    SERIALIZE_ITEM(&ttl->events, sizeof(*ttl->events), ttl->num_events, fp);
+    return 0;
+}
+
+int deserialize_thread(thread_timeline_t *ttl, FILE *fp)
+{
+    DESERIALIZE_ITEM(&ttl->thr_id, sizeof(ttl->thr_id), 1, fp);
+    DESERIALIZE_ITEM(&ttl->num_events, sizeof(ttl->num_events), 1, fp);
+    if(!(ttl->events = calloc(ttl->num_events,sizeof(*ttl->events)))) {
+        return -ENOMEM;
+    }
+    DESERIALIZE_ITEM(&ttl->events, sizeof(*ttl->events), ttl->num_events, fp);
+    return 0;
+}
+
+int serialize_process(proc_timeline_t *ptl, FILE *fp)
+{
+    int i, rc;
+    SERIALIZE_ITEM(&ptl->proc_id, sizeof(ptl->proc_id), 1, fp);
+    SERIALIZE_ITEM(&ptl->thr_num, sizeof(ptl->thr_num), 1, fp);
+    for(i=0; i<ptl->thr_num; i++){
+        if(rc = serialize_thread(&ptl->threads[i], fp) ) {
+            return rc;
+        }
+    }
+    return 0;
+}
+
+int deserialize_process(proc_timeline_t *ptl, FILE *fp)
+{
+    int i, rc;
+    DESERIALIZE_ITEM(&ptl->proc_id, sizeof(ptl->proc_id), 1, fp);
+    DESERIALIZE_ITEM(&ptl->thr_num, sizeof(ptl->thr_num), 1, fp);
+    ptl->threads = calloc(ptl->thr_num, sizeof(*ptl->threads));
+    if(!(ptl->threads = calloc(ptl->thr_num,sizeof(*ptl->threads)))) {
+        return -ENOMEM;
+    }
+    for(i=0; i<ptl->thr_num; i++){
+        if(rc = deserialize_thread(&ptl->threads[i], fp) ) {
+            return rc;
+        }
+    }
+    return 0;
+}
+
+
+int serialize_timeline(timeline_t *tl, char *fname)
+{
+    FILE *fp = fopen(fname, "w");
+    int i, rc;
+    if( !fp ) {
+        return EIO;
+    }
+    SERIALIZE_ITEM(&tl->proc_num, sizeof(tl->proc_num), 1, fp);
+    for(i = 0; i < tl->proc_num; i++) {
+        if( rc = serialize_process(&tl->procs[i], fp) ) {
+            return rc;
+        }
+    }
+    fclose(fp);
+}
+
+int deserialize_timeline(timeline_t *tl, char *fname)
+{
+    FILE *fp = fopen(fname, "r");
+    int i, rc;
+    if( !fp ) {
+        return EIO;
+    }
+    SERIALIZE_ITEM(&tl->proc_num, sizeof(tl->proc_num), 1, fp);
+    tl->procs = calloc(tl->proc_num, sizeof(*tl->procs));
+    for(i = 0; i < tl->proc_num; i++) {
+        if( rc = deserialize_process(&tl->procs[i], fp) ) {
+            return rc;
+        }
+    }
+    fclose(fp);
+}
+
 
 #ifdef STANDALONE
 int main()
 {
-    write_timeline(&tl, "output.gpl");
+    write_timeline(&tl, "output.gpl", 0, 0, 0, -1);
 }
 #endif

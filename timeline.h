@@ -11,6 +11,8 @@
 #ifndef TIMELINE_H
 #define TIMELINE_H
 
+#include <stdio.h>
+
 typedef enum {
     EVENT_POST,
     EVENT_WAIT
@@ -58,6 +60,9 @@ typedef struct {
     int proc_id;
 } resource_map_t;
 
-int write_timeline(timeline_t *tl, char *fname);
+int write_timeline(timeline_t *tl, char *fname,
+                   int start_p, int start_thr, int start_ev, int ev_count);
+int serialize_timeline(timeline_t *tl, char *fname);
+int deserialize_timeline(timeline_t *tl, char *fname);
 
 #endif // TIMELINE_H
