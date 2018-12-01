@@ -207,13 +207,11 @@ int mem_map() { /* nothing to do */ }
 
 void setup_thread_info_single(struct thread_info *ti)
 {
-    ti[0].tid = 0;
     ti[0].worker_idx = 0;
 }
 
 void setup_thread_info_multi(struct thread_info *ti, int i)
 {
-    ti[i].tid = i;
     ti[i].worker_idx = (want_thr_support != UCX_MODE_MT_WKR_SHARED ? i : 0);
 }
 

@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+//#define STANDALONE
 #include "timeline.h"
 
 int ystep = 1;

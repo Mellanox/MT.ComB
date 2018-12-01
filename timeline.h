@@ -27,19 +27,30 @@ typedef struct {
 typedef struct {
     int thr_id;
     int num_events;
+#ifdef STANDALONE
     timeline_event_t events[100];
+#else
+    timeline_event_t *events;
+#endif
 } thread_timeline_t;
-
 
 typedef struct {
     int proc_id;
     int thr_num;
+#ifdef STANDALONE
     thread_timeline_t threads[8];
+#else
+    thread_timeline_t *threads;
+#endif
 } proc_timeline_t;
 
 typedef struct {
     int proc_num;
+#ifdef STANDALONE
     proc_timeline_t procs[8];
+#else
+    proc_timeline_t *procs;
+#endif
 } timeline_t;
 
 typedef struct {
@@ -47,5 +58,6 @@ typedef struct {
     int proc_id;
 } resource_map_t;
 
+int write_timeline(timeline_t *tl, char *fname);
 
 #endif // TIMELINE_H

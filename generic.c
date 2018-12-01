@@ -51,6 +51,13 @@ char *binding_err_msgs[] = {
     "some process was unable to read it's affinity",
 };
 
+double get_time_nsec()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (ts.tv_sec + 1E-9 * ts.tv_nsec);
+}
+
 void sync_worker(struct thread_info *tinfo) {
     int tid = tinfo->tid;
     if (threads == 1) {
@@ -558,42 +565,69 @@ void *worker_nb(void *info) {
     if (i_am_sender) {
         void *sreqs = init_sreqs(win_size, (void *)databuf, msg_size, tag);
 
-        for (i = 0; i < (iterations + warmup); i++) {
-            if (i == warmup) {
-                /* ensure that all threads start "almost" together */
-                sync_worker(tinfo);
-                stime = MPI_Wtime();
-            }
-
+        /* Warmup first */
+        for (i = 0; i < warmup; i++) {
             for (j = 0; j < win_size; j++) {
                 nonblocking_send(databuf, msg_size, tinfo, tag, sreqs, j);
             }
-
             wait_all_sreqs(sreqs, tinfo, win_size);
         }
 
+        /* Do actual measurements */
+
+        sync_worker(tinfo);
+        stime = MPI_Wtime();
+
+        for (i = 0; i < iterations; i++) {
+            tinfo->evs[2*i].start = get_time_nsec();
+            tinfo->evs[2*i].type = EVENT_POST;
+            for (j = 0; j < win_size; j++) {
+                nonblocking_send(databuf, msg_size, tinfo, tag, sreqs, j);
+            }
+            tinfo->evs[2*i].end = get_time_nsec();
+
+            tinfo->evs[2*i + 1].start = get_time_nsec();
+            tinfo->evs[2*i + 1].type = EVENT_WAIT;
+            wait_all_sreqs(sreqs, tinfo, win_size);
+            tinfo->evs[2*i + 1].end = get_time_nsec();
+        }
+
+        etime = MPI_Wtime();
         cleanup_sreqs(sreqs);
     } else {
         void *rreqs = init_rreqs(win_size, (void *)databuf, msg_size, tag);
 
-        for (i = 0; i < (iterations + warmup); i++) {
-            if (i == warmup) {
-                /* ensure that all threads start "almost" together */
-                sync_worker(tinfo);
-                stime = MPI_Wtime();
-            }
-
+        /* Warmup first */
+        for (i = 0; i < warmup; i++) {
             for (j = 0; j < win_size; j++) {
                 nonblocking_recv(databuf, msg_size, tinfo, tag, rreqs, j);
             }
-
             wait_all_rreqs(rreqs, tinfo, win_size);
         }
 
+        /* Do actual measurements */
+
+        sync_worker(tinfo);
+        stime = MPI_Wtime();
+
+        for (i = 0; i < iterations; i++) {
+            tinfo->evs[2*i].start = get_time_nsec();
+            tinfo->evs[2*i].type = EVENT_POST;
+            for (j = 0; j < win_size; j++) {
+                nonblocking_recv(databuf, msg_size, tinfo, tag, rreqs, j);
+            }
+            tinfo->evs[2*i].end = get_time_nsec();
+
+            tinfo->evs[2*i + 1].start = get_time_nsec();
+            tinfo->evs[2*i + 1].type = EVENT_WAIT;
+            wait_all_rreqs(rreqs, tinfo, win_size);
+            tinfo->evs[2*i + 1].end = get_time_nsec();
+        }
+
+        etime = MPI_Wtime();
+
         cleanup_rreqs(rreqs);
     }
-
-    etime = MPI_Wtime();
 
     results[tag] = 1 / ((etime - stime) / (iterations * win_size));
 
@@ -777,6 +811,8 @@ int main(int argc, char *argv[]) {
     results = calloc(threads, sizeof(double));
     id = calloc(threads, sizeof(*id));
     sync_thread_ready = calloc(threads, sizeof(int));
+    timeline_event_t (*timings)[2 * iterations] = calloc(threads * 2 * iterations,
+                                             sizeof(timeline_event_t));
 
     /* allocate data buf */
     allocate_global_buf();
@@ -789,6 +825,8 @@ int main(int argc, char *argv[]) {
     MPI_Barrier(MPI_COMM_WORLD);
 
     if (threads == 1) {
+        ti[0].tid = 0;
+        ti[0].evs = timings[0];
         setup_thread_info_single(ti);
         sync_start_all = sync_cur_step;
         worker((void*)ti);
@@ -797,6 +835,8 @@ int main(int argc, char *argv[]) {
         WMB();
         /* setup and create threads */
         for (i = 0; i < threads; i++) {
+            ti[i].tid = i;
+            ti[i].evs = timings[i];
             setup_thread_info_multi(ti, i);
             pthread_create(&id[i], NULL, worker, (void *)&ti[i]);
         }
@@ -808,6 +848,28 @@ int main(int argc, char *argv[]) {
             pthread_join(id[i], NULL);
     }
 
+    {
+        /* Export the timelines */
+        timeline_t tl;
+        char fname[1024];
+        tl.proc_num = 1;
+        tl.procs = calloc(1, sizeof(*tl.procs));
+        tl.procs[0].proc_id = 0;
+        tl.procs[0].thr_num = threads;
+        tl.procs[0].threads = calloc(threads, sizeof(*tl.procs[i].threads));
+        for(i=0; i<threads; i++) {
+            tl.procs[0].threads[i].thr_id = i;
+            tl.procs[0].threads[i].num_events = iterations * 2;
+            tl.procs[0].threads[i].events = timings[i];
+        }
+        sprintf(fname, "mtcomb_timeline_%s_%d.gpl",
+                (i_am_sender) ? "sndr" : "rcvr", getpid());
+        write_timeline(&tl, fname);
+
+        free(tl.procs[0].threads);
+        free(tl.procs);
+        free(timings);
+    }
 
     print_results(comm);
 

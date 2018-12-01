@@ -26,6 +26,7 @@
 #include <sched.h>
 #include <assert.h>
 
+#include "timeline.h"
 //#define DEBUG
 
 #define WMB() \
@@ -39,6 +40,8 @@
 
 struct thread_info {
     int tid;
+    timeline_event_t *evs;
+    /* driver-specific options */
     MPI_Comm comm;
     int worker_idx;
 };

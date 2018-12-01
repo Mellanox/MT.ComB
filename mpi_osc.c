@@ -44,7 +44,6 @@ int mem_map() { /* nothing to do */ }
 /* Same as for MPI */
 void setup_thread_info_single(struct thread_info *ti)
 {
-    ti[0].tid = 0;
     if (dup_comm) {
         MPI_Comm_dup(MPI_COMM_WORLD, &ti[0].comm);
     } else {
@@ -54,7 +53,6 @@ void setup_thread_info_single(struct thread_info *ti)
 
 void setup_thread_info_multi(struct thread_info *ti, int i)
 {
-    ti[i].tid = i;
     if (dup_comm) {
         MPI_Comm_dup(MPI_COMM_WORLD, &ti[i].comm);
     } else {

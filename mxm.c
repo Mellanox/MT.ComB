@@ -125,6 +125,10 @@ int connect_eps() {
 
 int mem_map() { /* nothing to do */ }
 
+void setup_thread_info_single(struct thread_info *ti) {  }
+void setup_thread_info_multi(struct thread_info *ti, int i) { }
+void cleanup_thread_info(struct thread_info *ti, int size) { }
+
 void cleanup_ctx() {
     mxm_mq_destroy(mq);
     mxm_ep_disconnect(conn);
