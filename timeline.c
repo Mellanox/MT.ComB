@@ -207,7 +207,7 @@ int _write_timeline(timeline_t *tl, FILE *fp)
 
     /* Print ranges and y lables */
     find_timeline_xrange(tl, &start, &end);
-    fprintf(fp, "set xrange [%lf:%lf]\n", start, end);
+    fprintf(fp, "set xrange [0.000:%lf]\n", 1E6*(end - start));
     char ytics[1024] = "";
     nres = find_timeline_res(tl, &map);
     build_yticks(tl, map, nres, ystep, ytics, 1024);
