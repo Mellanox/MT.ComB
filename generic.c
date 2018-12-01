@@ -773,14 +773,17 @@ int main(int argc, char *argv[]) {
     pre_scan_args(argc, argv);
 
     if (want_thr_support && is_mpi_based_test()) {
-        MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &mt_level_act);
+        MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &mt_level_act);
         if( mt_level_act != MPI_THREAD_MULTIPLE ){
             if (rank == 0) {
-                fprintf(stderr, "ERROR: Unable to initialize MPI thread support!\n");
+                fprintf(stderr, "ERROR: Unable to initialize MPI thread support: mt_level = %d!\n",
+                        mt_level_act);
                 MPI_Finalize();
                 exit(0);
             }
         }
+    } else if( want_thr_support) {
+        MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &mt_level_act);
     } else {
         MPI_Init(&argc, &argv);
     }
