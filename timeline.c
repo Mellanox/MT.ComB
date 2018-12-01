@@ -146,7 +146,8 @@ void build_yticks(timeline_t *tl, resource_map_t *map, int nres, int step,
 }
 
 
-void write_bars(FILE *fp, timeline_t *tl, resource_map_t *map, int nres, int ystep)
+void write_bars(FILE *fp, timeline_t *tl, double range_start,
+                resource_map_t *map, int nres, int ystep)
 {
     int p, t;
     int objnum = 1;
@@ -162,9 +163,13 @@ void write_bars(FILE *fp, timeline_t *tl, resource_map_t *map, int nres, int yst
             for(e = 0; e < tl->procs[p].threads[t].num_events; e++){
                 timeline_event_t *ev = &tl->procs[p].threads[t].events[e];
                 fprintf(fp, "set object %d rectangle from ", objnum++);
-                fprintf(fp, "%lf, %f", ev->start, (i + 1) * ystep - ydelta);
+                fprintf(fp, "%lf, %f",
+                        ev->start - range_start,
+                        (i + 1) * ystep - ydelta);
                 fprintf(fp," to ");
-                fprintf(fp, "%lf, %f", ev->end, (i + 1) * ystep + ydelta);
+                fprintf(fp, "%lf, %f",
+                        ev->end - range_start,
+                        (i + 1) * ystep + ydelta);
                 fprintf(fp, " fillcolor rgb ");
                 switch(ev->type) {
                 case EVENT_POST:
@@ -210,7 +215,7 @@ int _write_timeline(timeline_t *tl, FILE *fp)
     fprintf(fp, "set ytics %s\n", ytics);
     fprintf(fp, "set title \"MT.ComB: %d-thread timeline\"\n", nres);
 
-    write_bars(fp, tl, map, nres, ystep);
+    write_bars(fp, tl, start, map, nres, ystep);
 
     fprintf(fp, "plot \\\n"
             "-1 title \"Post\" with lines linecolor rgb \"" COLOR_1 "\" linewidth 6, \\\n"
