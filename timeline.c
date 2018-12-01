@@ -64,7 +64,7 @@ void find_proc_xrange(proc_timeline_t *proc_tl, double *_start, double *_end)
     for(t = 0; t < proc_tl->thr_num; t++){
         double t_start, t_end;
         find_thread_xrange(&proc_tl->threads[t], &t_start, &t_end);
-        if( 0 > start || (start < t_start) ) {
+        if( 0 > start || (start > t_start) ) {
             start = t_start;
         }
         if( 0 > end || (end < t_end) ) {
