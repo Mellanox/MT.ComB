@@ -83,7 +83,7 @@ void find_timeline_xrange(timeline_t *tl, double *_start, double *_end)
     for(p = 0; p < tl->proc_num; p++){
         double t_start, t_end;
         find_proc_xrange(&tl->procs[p], &t_start, &t_end);
-        if( 0 > start || (start < t_start) ) {
+        if( 0 > start || (start > t_start) ) {
             start = t_start;
         }
         if( 0 > end || (end < t_end) ) {
