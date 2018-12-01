@@ -163,12 +163,12 @@ void write_bars(FILE *fp, timeline_t *tl, double range_start,
             for(e = 0; e < tl->procs[p].threads[t].num_events; e++){
                 timeline_event_t *ev = &tl->procs[p].threads[t].events[e];
                 fprintf(fp, "set object %d rectangle from ", objnum++);
-                fprintf(fp, "%lf, %f",
-                        ev->start - range_start,
+                fprintf(fp, "%.3lf, %f",
+                        1E6*(ev->start - range_start),
                         (i + 1) * ystep - ydelta);
                 fprintf(fp," to ");
-                fprintf(fp, "%lf, %f",
-                        ev->end - range_start,
+                fprintf(fp, "%.3lf, %f",
+                        1E6*(ev->end - range_start),
                         (i + 1) * ystep + ydelta);
                 fprintf(fp, " fillcolor rgb ");
                 switch(ev->type) {
