@@ -9,7 +9,7 @@
 #
 
 CFLAGS ?= -g -lpthread
-MPICC ?= 
+MPICC ?= mpicc
 
 UCX_HOME ?= 
 UCX_CFLAGS = -I$(UCX_HOME)/include/
