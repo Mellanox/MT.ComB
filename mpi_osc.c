@@ -95,7 +95,7 @@ void nonblocking_send(void* data_buf, int msg_sz, struct thread_info *tinfo, int
     while (delay) {
         sleep(1);
     }
-    MPI_Put(data_buf, msg_sz, MPI_BYTE, my_partner, 0, msg_sz, MPI_BYTE, win);
+    MPI_Put(data_buf, msg_sz, MPI_BYTE, my_partner, tinfo->tid * remote_buf_unit_size, msg_sz, MPI_BYTE, win);
 }
 
 void nonblocking_recv(void* data_buf, int msg_sz, struct thread_info *tinfo, int tag, void *rreqs, int idx) {
@@ -113,7 +113,7 @@ void wireup_progress(struct thread_info *tinfo) {
 }
 
 void blocking_send(void* data_buf, int msg_sz, struct thread_info *tinfo, int tag){
-    MPI_Put(data_buf, msg_sz, MPI_BYTE, my_partner, 0, msg_sz, MPI_BYTE, win);
+    MPI_Put(data_buf, msg_sz, MPI_BYTE, my_partner, tinfo->tid * remote_buf_unit_size, msg_sz, MPI_BYTE, win);
     MPI_Win_flush(my_partner, win);
 }
 

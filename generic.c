@@ -791,9 +791,6 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    /* allocate data buf */
-    allocate_global_buf();
-
     process_args(argc, argv);
 
     if (threads > 1) {
@@ -802,6 +799,9 @@ int main(int argc, char *argv[]) {
     }
 
     comm = split_to_pairs();
+
+    /* allocate data buf */
+    allocate_global_buf();
 
     if (ret = init_ctx()) {
         MPI_Finalize();
