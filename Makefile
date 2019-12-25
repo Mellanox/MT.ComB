@@ -8,7 +8,7 @@
 #   $HEADER$
 #
 
-CFLAGS ?= -g -lpthread
+CFLAGS ?= -g  -lpthread -DMULTI_MESSAGES
 MPICC ?= mpicc
 
 UCX_HOME ?= 
