@@ -25,6 +25,7 @@ int send_alignment = 1;
 int recv_alignment = 1;
 int buf_unit_size, remote_buf_unit_size;
 int generate_graphs = 0;
+int all_sizes = 1;
 
 int my_host_idx = -1, my_rank_idx = -1, my_leader = -1;
 int my_partner, i_am_sender = 0;
@@ -123,8 +124,8 @@ void usage(char *cmd) {
     fprintf(stderr, "Options: %s\n", cmd);
     fprintf(stderr, "\t-h\tDisplay this help\n");
     fprintf(stderr, "Test description:\n");
-    fprintf(stderr, "\t-s\tMessage size (default: %d)\n", msg_size);
-    fprintf(stderr, "\t-n\tNumber of measured iterations (default: %d)\n", iterations);
+    fprintf(stderr, "\t-s\tMessage size (default: all message sizes (power of 2 from 0 to 4Mb))\n");
+    fprintf(stderr, "\t-n\tNumber of measured iterations if message size was selected (default: %d)\n", iterations);
     fprintf(stderr, "\t-w\tNumber of warmup iterations (default: %d)\n", warmup);
     fprintf(stderr, "\t-W\tWindow size - number of send/recvs between sync (default: %d)\n", win_size);
     fprintf(stderr, "\t-t\tNumber of threads (default: %d)\n", threads);
@@ -219,6 +220,7 @@ void process_args(int argc, char **argv) {
             if (msg_size == 0) {
                 goto error;
             }
+            all_sizes = 0;
             break;
         case 'd':
             dup_comm = 1;
@@ -783,6 +785,7 @@ void run_benchmark(MPI_Comm comm)
 {
 
     int i, j;
+    int num_messages = 1;
     int ret;
     pthread_t *id;
     struct thread_info *ti = calloc(threads, sizeof(struct thread_info));
@@ -796,21 +799,24 @@ void run_benchmark(MPI_Comm comm)
                              sizeof(timeline_event_t));
     }
 
-    //                    0     1     2     4     8    16    32    64   128   256   512  1024    2K   4K   8K  16K  32K  64K  128K 256K 512K 1M 2M 4M
-    int arr_iters[24] = {1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 100, 100, 100, 100, 100, 10,   10,  10,  5, 5, 5};
+    //                    0     1     2     4     8     16    32    64   128   256   512   1024    2K   4K   8K  16K  32K  64K  128K 256K 512K 1M 2M 4M
+    int arr_iters[24] = {1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 100, 100, 100, 100, 100, 100,  10,  10,  5, 5, 5};
 
     if (ret = mem_map()) {
         MPI_Finalize();
         exit(1);
     }
 
-#ifdef MULTI_MESSAGES
-    msg_size = 0;
-    for (j = 0; j < 24; j++) {
-        if (j == 1) msg_size = 1;
-        else msg_size *= 2;
-        iterations = arr_iters[j];
-#endif
+    if (all_sizes) {
+        msg_size = 0;
+        num_messages = sizeof(arr_iters) / sizeof(int);
+    }
+    for (j = 0; j < num_messages; j++) {
+        if (all_sizes) {
+            if (j == 1) msg_size = 1;
+            else msg_size *= 2;
+            iterations = arr_iters[j];
+        }
         MPI_Barrier(MPI_COMM_WORLD);
         usleep(100);
 
@@ -870,9 +876,7 @@ void run_benchmark(MPI_Comm comm)
 
         cleanup_thread_info(ti, threads);
 
-#ifdef MULTI_MESSAGES
     }
-#endif
 
     free(id);
     free(results);
