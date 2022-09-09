@@ -129,8 +129,8 @@ void usage(char *cmd) {
     fprintf(stderr, "\t-w\tNumber of warmup iterations (default: %d)\n", warmup);
     fprintf(stderr, "\t-W\tWindow size - number of send/recvs between sync (default: %d)\n", win_size);
     fprintf(stderr, "\t-t\tNumber of threads (default: %d)\n", threads);
-    fprintf(stderr, "\t-l\tAlignment on sender buffer (default: %d\n", send_alignment);
-    fprintf(stderr, "\t-r\tAlignment on receiver buffer (default: %d\n", recv_alignment);
+    fprintf(stderr, "\t-l\tAlignment on sender buffer (default: %d)\n", send_alignment);
+    fprintf(stderr, "\t-r\tAlignment on receiver buffer (default: %d)\n", recv_alignment);
     fprintf(stderr, "Test options:\n");
     fprintf(stderr, "\t-B\tBlocking send (default: %s)\n", (worker == worker_b) ? "blocking" : "non-blocking");
     fprintf(stderr, "\t-S\tSMP mode - intra-node performance - pairwise exchanges (default: %s)\n", 
