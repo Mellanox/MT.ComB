@@ -92,11 +92,11 @@ void nonblocking_recv(void* data_buf, int msg_sz, struct thread_info *tinfo, int
 }
 
 void wait_all_sreqs(void *sreqs, struct thread_info *tinfo, int num_sreqs) {
-    MPI_Waitall(num_sreqs, (MPI_Request *)sreqs, MPI_STATUS_IGNORE);
+    MPI_Waitall(num_sreqs, (MPI_Request *)sreqs, MPI_STATUSES_IGNORE);
 }
 
 void wait_all_rreqs(void *rreqs, struct thread_info *tinfo, int num_rreqs) {
-    MPI_Waitall(num_rreqs, (MPI_Request *)rreqs, MPI_STATUS_IGNORE);
+    MPI_Waitall(num_rreqs, (MPI_Request *)rreqs, MPI_STATUSES_IGNORE);
 }
 
 void blocking_send(void* data_buf, int msg_sz, struct thread_info *tinfo, int tag) {
