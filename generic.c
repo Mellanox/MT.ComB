@@ -778,7 +778,7 @@ void set_default_args() {
     win_size = 256;
     iterations = 50;
     warmup = 10;
-    msg_size = 0;
+    msg_size = (all_sizes ? (4 * 1024 * 1024) : 0);
 }
 
 void run_benchmark(MPI_Comm comm)
