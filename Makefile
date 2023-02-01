@@ -22,13 +22,16 @@ LIBF_HOME ?=
 GENERIC_DEPS = generic.h generic.c mpi.c timeline.c
 GENERIC_CFILES = generic.c timeline.c
 
-all: mtcomb_mpip2p mtcomb_mpiosc mtcomb_ucxp2p mtcomb_ucxamo
+all: mtcomb_mpip2p mtcomb_mpiosc_put mtcomb_mpiosc_accumulate mtcomb_ucxp2p mtcomb_ucxamo
 
 mtcomb_mpip2p: $(GENERIC_DEPS) mpi.c
 	$(MPICC) $(CFLAGS) -o mtcomb_mpi mpi.c $(GENERIC_CFILES)
 
-mtcomb_mpiosc: $(GENERIC_DEPS) mpi_osc.c
-	$(MPICC) $(CFLAGS) -o mtcomb_mpiosc mpi_osc.c $(GENERIC_CFILES)
+mtcomb_mpiosc_put: $(GENERIC_DEPS) mpi_osc/mpi_osc_put.c
+	$(MPICC) $(CFLAGS) -o mtcomb_mpiosc_put mpi_osc/mpi_osc_put.c $(GENERIC_CFILES)
+
+mtcomb_mpiosc_accumulate: $(GENERIC_DEPS) mpi_osc/mpi_osc_accumulate.c
+	$(MPICC) $(CFLAGS) -o mtcomb_mpiosc_accumulate mpi_osc/mpi_osc_accumulate.c $(GENERIC_CFILES)
 
 mtcomb_ucxp2p: $(GENERIC_DEPS) ucx.c
 	$(MPICC) -Wl,-rpath,$(UCX_HOME)/lib/ $(CFLAGS) $(UCX_CFLAGS) -o mtcomb_ucxp2p ucx.c $(GENERIC_CFILES) $(UCX_LDFLAGS)
