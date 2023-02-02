@@ -742,6 +742,13 @@ void allocate_global_buf() {
     }
 }
 
+void print_header() {
+    if (0 == my_rank_idx && i_am_sender) {
+        printf(">%-15s%15s%15s\n", "size (Bytes)", "M/R (Msgs/Sec)", "B/W (MB/Sec)");
+        fflush(stdout);
+    }
+}
+
 void print_results(MPI_Comm comm) {
 #ifdef DEBUG
     int j;
@@ -755,7 +762,7 @@ void print_results(MPI_Comm comm) {
 
     if (i_am_sender) {
         /* FIXME: for now only count on sender side, extend if makes sense */
-        double results_rank = 0, results_node = 0;
+        double results_rank = 0.0, results_node = 0.0, bandwidth = 0.0;
         int i;
 
         for (i = 0; i < threads; i++) {
@@ -765,7 +772,9 @@ void print_results(MPI_Comm comm) {
         MPI_Reduce(&results_rank, &results_node, 1, MPI_DOUBLE, MPI_SUM, my_leader, comm);
 
         if (my_rank_idx == 0) { /* output: msg throughput per rank */
-            printf(">\t%d\t%10.2lf Messages per second\n", msg_size, results_node);
+            bandwidth = (results_node * msg_size)/1.0e6;
+            printf(">%-15d%13.2lf%13.2lf\n", msg_size, results_node, bandwidth);
+            fflush(stdout);
         }
     }
 }
@@ -775,7 +784,7 @@ void print_results(MPI_Comm comm) {
 void set_default_args() {
     worker = worker_nb;
     threads = 1;
-    win_size = 256;
+    win_size = 64;
     iterations = 50;
     warmup = 10;
     msg_size = (all_sizes ? (4 * 1024 * 1024) : 0);
@@ -799,9 +808,9 @@ void run_benchmark(MPI_Comm comm)
                              sizeof(timeline_event_t));
     }
 
-    //                    0     1     2     4     8     16    32    64   128   256   512   1024    2K   4K   8K  16K  32K  64K  128K 256K 512K 1M 2M 4M
-    int arr_iters[24] = {1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 100, 100, 100, 100, 100, 100,  10,  10,  5, 5, 5};
-
+    //                    0     1      2      4      8      16     32     64     128    256    512    1024   2K     4K    8K    16K   32K   64K   128K   256K   512K   1M    2M    4M
+    int arr_iters[24] = {10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 1000, 1000, 1000, 1000, 1000, 1000,  1000,  1000,  1000, 1000, 1000};
+    int arr_warmup[24] = {100,  100,   100,   100,   100,   100,   100,   100,   100,   100,   100,   100,   100,   100,  100,  10,   10,   10,   10,    10,    10,    10,   10,   10};
     if (ret = mem_map()) {
         MPI_Finalize();
         exit(1);
@@ -811,11 +820,15 @@ void run_benchmark(MPI_Comm comm)
         msg_size = 0;
         num_messages = sizeof(arr_iters) / sizeof(int);
     }
+
+    print_header();
+
     for (j = 0; j < num_messages; j++) {
         if (all_sizes) {
             if (j == 1) msg_size = 1;
             else msg_size *= 2;
             iterations = arr_iters[j];
+            warmup = arr_warmup[j];
         }
         MPI_Barrier(MPI_COMM_WORLD);
         usleep(100);
