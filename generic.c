@@ -25,6 +25,8 @@ int send_alignment = 1;
 int recv_alignment = 1;
 int buf_unit_size, remote_buf_unit_size;
 int generate_graphs = 0;
+int enable_target_compute = 0;
+int prec_count = 0;
 int all_sizes = 1;
 
 int my_host_idx = -1, my_rank_idx = -1, my_leader = -1;
@@ -37,6 +39,9 @@ timeline_t tl;
 
 /* Message rate for each thread */
 double *results;
+
+/* Target side blocking computation time*/
+double *results_comp;
 
 /*data buf on sendera and receiver */
 char *global_buf = NULL;
@@ -154,7 +159,7 @@ void process_args(int argc, char **argv) {
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    while ((c = getopt(argc, argv, "hD:t:BbW:n:w:ds:Svl:r:E:g")) != -1) {
+    while ((c = getopt(argc, argv, "hD:t:BbW:n:w:ds:Svl:r:E:gc:")) != -1) {
         switch (c) {
         case 'h':
             if (0 == rank) {
@@ -250,6 +255,10 @@ void process_args(int argc, char **argv) {
             break;
         case 'g':
             generate_graphs = 1;
+            break;
+        case 'c':
+            enable_target_compute = 1;
+            prec_count = atoi(optarg);
             break;
         default:
             c = -1;
@@ -557,11 +566,39 @@ save_rank:
     return comm;
 }
 
+void compute_pi(int count) {
+    int r[count + 1];
+    int i, k;
+    int b, d;
+    int c = 0;
+
+    for (i = 0; i < count; i++) {
+        r[i] = 2000;
+    }
+
+    for (k = count; k > 0; k -= 14) {
+        d = 0;
+
+        i = k;
+        for (;;) {
+            d += r[i] * 10000;
+            b = 2 * i - 1;
+
+            r[i] = d % b;
+            d /= b;
+            i--;
+            if (i == 0) break;
+            d *= i;
+        }
+        c = d % 10000;
+    }
+}
 
 void *worker_nb(void *info) {
     struct thread_info *tinfo = (struct thread_info*)info;
     int tag, i, j;
     double stime, etime;
+    double comp_stime = 0.0, comp_etime = 0.0;
     char *databuf = NULL;
 
     databuf = &(global_buf[tinfo->tid * buf_unit_size]);
@@ -621,6 +658,12 @@ void *worker_nb(void *info) {
 
         sync_worker(tinfo);
         stime = MPI_Wtime();
+        /* start a blocking computation on receiver side */
+        if (enable_target_compute) {
+            comp_stime = MPI_Wtime();
+            compute_pi(prec_count);
+            comp_etime = MPI_Wtime();
+        }
 
         for (i = 0; i < iterations; i++) {
             if (generate_graphs) {
@@ -648,7 +691,7 @@ void *worker_nb(void *info) {
     }
 
     results[tag] = 1 / ((etime - stime) / (iterations * win_size));
-
+    results_comp[tag] = ((comp_etime - comp_stime));
     return 0;
 }
 
@@ -694,7 +737,8 @@ void *worker_b(void *info) {
 
     etime = MPI_Wtime();
     results[tag] = 1 / ((etime - stime) / (iterations * win_size));
-
+    /* Not enabling target side computation timer in blocking case */
+    results_comp[tag] = 0.0;
     return 0;
 }
 
@@ -744,7 +788,11 @@ void allocate_global_buf() {
 
 void print_header() {
     if (0 == my_rank_idx && i_am_sender) {
-        printf(">%-15s%15s%15s\n", "size (Bytes)", "M/R (Msgs/Sec)", "B/W (MB/Sec)");
+        if(!enable_target_compute) {
+            printf(">%-15s%15s%15s\n", "size (Bytes)", "M/R (Msgs/Sec)", "B/W (MB/Sec)");
+        } else {
+            printf(">%-15s%15s%15s%18s\n", "size (Bytes)", "M/R (Msgs/Sec)", "B/W (MB/Sec)", "Target comp (Sec)");
+        }
         fflush(stdout);
     }
 }
@@ -762,7 +810,7 @@ void print_results(MPI_Comm comm) {
 
     if (i_am_sender) {
         /* FIXME: for now only count on sender side, extend if makes sense */
-        double results_rank = 0.0, results_node = 0.0, bandwidth = 0.0;
+        double results_rank = 0.0, results_node = 0.0, bandwidth = 0.0, result_comp_node = 0.0;
         int i;
 
         for (i = 0; i < threads; i++) {
@@ -772,9 +820,26 @@ void print_results(MPI_Comm comm) {
         MPI_Reduce(&results_rank, &results_node, 1, MPI_DOUBLE, MPI_SUM, my_leader, comm);
 
         if (my_rank_idx == 0) { /* output: msg throughput per rank */
+            MPI_Recv(&result_comp_node, 1, MPI_DOUBLE, my_partner, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             bandwidth = (results_node * msg_size)/1.0e6;
-            printf(">%-15d%13.2lf%13.2lf\n", msg_size, results_node, bandwidth);
+            if(!enable_target_compute) {
+                printf(">%-15d%13.2lf%13.2lf\n", msg_size, results_node, bandwidth);
+            } else {
+                printf(">%-15d%13.2lf%13.2lf%16.2lf\n", msg_size, results_node, bandwidth, result_comp_node);
+            }
             fflush(stdout);
+        }
+    } else {
+        double result_comp_rank = 0.0, result_comp_node = 0.0;
+        int i;
+        
+        for (i = 0; i < threads; i++) {
+            result_comp_rank += results_comp[i];
+        }
+        MPI_Reduce(&result_comp_rank, &result_comp_node, 1, MPI_DOUBLE, MPI_SUM, 0, comm);
+
+        if (my_rank_idx == 0) {
+            MPI_Send(&result_comp_node, 1, MPI_DOUBLE, my_partner, 0, MPI_COMM_WORLD);
         }
     }
 }
@@ -799,6 +864,7 @@ void run_benchmark(MPI_Comm comm)
     pthread_t *id;
     struct thread_info *ti = calloc(threads, sizeof(struct thread_info));
     results = calloc(threads, sizeof(double));
+    results_comp = calloc(threads, sizeof(double));
     id = calloc(threads, sizeof(*id));
     sync_thread_ready = calloc(threads, sizeof(int));
     timeline_event_t (*timings)[2 * iterations] = NULL;
@@ -893,6 +959,7 @@ void run_benchmark(MPI_Comm comm)
 
     free(id);
     free(results);
+    free(results_comp);
     free(global_buf);
     free(ti);
 
