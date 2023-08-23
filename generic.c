@@ -222,7 +222,7 @@ void process_args(int argc, char **argv) {
                 goto error;
             }
             msg_size = atoi(optarg);
-            if (msg_size == 0) {
+            if (msg_size < 0) {
                 goto error;
             }
             all_sizes = 0;
